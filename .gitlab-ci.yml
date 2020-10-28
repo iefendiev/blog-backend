@@ -1,0 +1,41 @@
+stages:
+  - build
+  - deploy
+
+variables:
+  CI_IMAGE_TAG: ${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
+
+Build:
+  image: docker:18.09
+  stage: build
+  services:
+    - docker:18.09-dind
+  variables:
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_DRIVER: overlay2
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - docker build -t $CI_REGISTRY_IMAGE:$CI_IMAGE_TAG .
+    - docker tag $CI_REGISTRY_IMAGE:$CI_IMAGE_TAG $CI_REGISTRY_IMAGE:latest
+    - docker push $CI_REGISTRY_IMAGE:$CI_IMAGE_TAG
+
+Deploy:
+  stage: deploy
+  image: debian:10-slim
+  before_script:
+    - apt update
+    - apt install --no-install-recommends -y openssh-client gettext-base
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan $REMOTE_SERVER_IP  >> ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+  script:
+    - mkdir blog
+    # - cp $GOOGLE_APPLICATION_CREDENTIALS hotpet/service-account.json
+    - envsubst < docker-compose.yml > blog/docker-compose.yml
+    - scp -r blog blog@$REMOTE_SERVER_IP:/home/blog
+    - ssh blog@$REMOTE_SERVER_IP "cd /home/blog/blog && docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY && docker-compose up"

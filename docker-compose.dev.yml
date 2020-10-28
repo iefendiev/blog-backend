@@ -1,0 +1,33 @@
+version: "3.5"
+
+services:
+  # mongo:
+  #   image: mongo:4.4.1
+  #   networks:
+  #     - blog
+  #   ports:
+  #     - 27017
+  #   volumes:
+  #     - mongo-1:/data
+
+  blog:
+    image: node:12.18.4-stretch-slim
+    expose:
+      - 3000
+    working_dir: /app
+    volumes:
+      - ./:/app
+    ports:
+      - 3000:3000
+    # networks:
+    #   - blog
+    environment:
+      MONGODB_CONNECTION_STRING: ${MONGODB_CONNECTION_STRING}
+      SECRET: ${SECRET}
+      GMAIL_USERNAME: ${GMAIL_USERNAME}
+      GMAIL_PASSWORD: ${GMAIL_PASSWORD}
+    entrypoint: /app/docker-entrypoint.sh
+# networks:
+#   blog:
+# volumes:
+#   mongo:
